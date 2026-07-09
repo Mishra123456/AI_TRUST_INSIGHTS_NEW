@@ -304,6 +304,9 @@ class TrustRAG:
             return "General Skepticism"
             
         if self._category_vectors is None:
+            self.initialize()
+            
+        if self._category_vectors is None:
             return [keyword_fallback(t) for t in texts]
             
         # Bulk encode all texts in one API call
@@ -338,11 +341,7 @@ class TrustRAG:
             if v
         ]
 
-# Initialize model at module load to prevent per-request latency
-try:
-    TrustRAG.initialize()
-except Exception as e:
-    print(f"Warning: ML Model failed to load: {e}")
+# (Initialization is now handled lazily on the first request to avoid boot-time network errors on Render)
 
 
 # -----------------------------
