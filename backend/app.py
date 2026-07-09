@@ -1,7 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 import os
 import pandas as pd
 import numpy as np
@@ -28,11 +26,26 @@ except LookupError:
 app = FastAPI(title="TrustScope – Human–AI Trust Intelligence")
 
 # -----------------------------
-# CORS
+# CORS – restrict to your Vercel frontend + local dev
 # -----------------------------
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",        # Vite dev server
+    "http://localhost:8080",        # Vite alt port
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8080",
+]
+
+# Auto-include your Vercel production URL if set
+_vercel_url = os.getenv("FRONTEND_URL")  # e.g. https://trustscope.vercel.app
+if _vercel_url:
+    ALLOWED_ORIGINS.append(_vercel_url.rstrip("/"))
+else:
+    # Fallback: allow all origins if FRONTEND_URL is not configured yet
+    ALLOWED_ORIGINS = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -578,8 +591,12 @@ async def analyze(file: UploadFile = File(...)):
 
 
 # -----------------------------
-# API Health Check
+# API Health Check & Static SPA
 # -----------------------------
+@app.get("/api/health")
+def health_check():
+    return {"status": "healthy", "message": "TrustScope API is live!"}
+
 @app.get("/")
-def read_root():
-    return {"status": "healthy", "message": "TrustScope API is live on Render!"}
+def root():
+    return {"message": "TrustScope API is running. Frontend is deployed on Vercel."}

@@ -1,0 +1,6 @@
+date,department,model_decision,human_decision,ground_truth,confidence_note
+2023-10-01,Underwriting,Approve,Approve,Approve,"Looks completely standard."
+2023-10-02,Fraud,Reject,Reject,Reject,"Clear signs of fraud."
+2023-10-03,Compliance,Approve,Reject,Reject,"Model missed a critical nuance here."
+2023-10-04,Underwriting,Approve,Approve,Approve,"Safe profile, no issues."
+2023-10-05,Fraud,Approve,Approve,Reject,"This is very confusing and weird, I don't really trust the AI, but I'm too busy to check."
