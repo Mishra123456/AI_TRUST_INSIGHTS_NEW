@@ -52,12 +52,16 @@ def extract_nlp_features(df):
     # 2. Negativity score: [0, 1]
     df["negativity"] = notes.apply(lambda x: sia.polarity_scores(x)["neg"])
 
-    # 3. Skepticism flag: [0, 1]
-    df["skepticism_flag"] = notes.str.contains(
-        "wrong|missed|override|manual|human|uncertain|mismatch|bias|doubt",
+    # 3. Skepticism flag: [0, 1] (Triggered by keywords OR highly negative sentiment)
+    has_keywords = notes.str.contains(
+        "wrong|missed|override|manual|human|uncertain|mismatch|bias|doubt|suspicious|confusing|weird",
         case=False,
         na=False,
-    ).astype(int)
+    )
+    df["skepticism_flag"] = (has_keywords | (df["sentiment"] < -0.2)).astype(int)
+
+    # Complacency Flag: They were skeptical, but they DID NOT override (Rubber-stamping)
+    df["is_complacent"] = (df["skepticism_flag"] == 1) & (df["override"] == False)
 
     # 4. Note character length (normalized)
     lengths = notes.str.len()
@@ -140,13 +144,12 @@ def calculate_metrics(df):
             trust_score=("override", lambda x: 1.0 - x.mean()),
             avg_sentiment=("sentiment", "mean"),
             skepticism_rate=("skepticism_flag", "mean"),
+            complacency_risk=("is_complacent", "mean"),
             total_cases=("override", "count"),
         )
         .reset_index()
     )
     
-    # Complacency Risk: High skepticism expressed but very low overrides (rubber-stamping)
-    grouped["complacency_risk"] = (grouped["skepticism_rate"] - grouped["override_rate"]).clip(lower=0.0)
     return grouped
 
 # -----------------------------
