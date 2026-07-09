@@ -2,8 +2,6 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-import os
-import gradio as gr
 import pandas as pd
 import numpy as np
 
@@ -555,42 +553,8 @@ async def analyze(file: UploadFile = File(...)):
 
 
 # -----------------------------
-# Serve React Frontend (SPA)
+# Headless API Only (Frontend is on Vercel)
 # -----------------------------
-# This must be at the very bottom so it doesn't intercept /analyze
-
-# Check if we are running in a Docker container or local environment
-# In Docker, we usually copy the dist folder to /app/dist
-dist_dir = os.path.join(os.path.dirname(__file__), "..", "dist")
-
-if os.path.exists(os.path.join(dist_dir, "assets")):
-    app.mount("/assets", StaticFiles(directory=os.path.join(dist_dir, "assets")), name="assets")
-
-@app.get("/{full_path:path}")
-async def serve_react_app(full_path: str):
-    file_path = os.path.join(dist_dir, full_path)
-    
-    if os.path.isfile(file_path):
-        return FileResponse(file_path)
-    
-    index_file = os.path.join(dist_dir, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-        
-    return {"message": "Frontend build not found. Run 'npm run build' first."}
-
-
-# -----------------------------
-# Gradio Wrapper (For Hugging Face Free Tier)
-# -----------------------------
-# Hugging Face Gradio SDK allows free hosting without credit card verification.
-# We wrap the FastAPI app in a dummy Gradio app so their servers host it for free.
-demo = gr.Interface(
-    fn=lambda: "TrustScope Backend is Live!",
-    inputs=None,
-    outputs="text",
-    title="TrustScope API",
-    description="This is a headless API. The frontend is served via the main endpoint."
-)
-
-app = gr.mount_gradio_app(app, demo, path="/_gradio_debug")
+@app.get("/")
+def read_root():
+    return {"status": "healthy", "message": "TrustScope ML API is running!"}
