@@ -2,6 +2,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+import os
+import gradio as gr
 import pandas as pd
 import numpy as np
 
@@ -214,32 +216,44 @@ def intervention_priority(metrics):
 
 
 # -----------------------------
-# RAG-STYLE THEME ANALYSIS (SEMANTIC WITH KEYWORD FALLBACK)
+# RAG-STYLE THEME ANALYSIS (HUGGING FACE API)
 # -----------------------------
-from sentence_transformers import SentenceTransformer
-import faiss
+import requests
+from sklearn.metrics.pairwise import cosine_similarity
+import json
+import time
 
 class TrustRAG:
-    _model = None
-    _index = None
     _categories = []
+    _category_vectors = None
+    
+    API_URL = "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
     
     @classmethod
-    def initialize(cls):
-        if cls._model is not None:
-            return
+    def get_embeddings(cls, texts):
+        # Hugging Face Free API allows up to a certain rate limit.
+        headers = {}
+        HF_TOKEN = os.getenv("HF_TOKEN")
+        if HF_TOKEN:
+            headers["Authorization"] = f"Bearer {HF_TOKEN}"
             
+        payload = {"inputs": texts}
         try:
-            # Load lightweight efficient model
-            cls._model = SentenceTransformer('all-MiniLM-L6-v2')
+            response = requests.post(cls.API_URL, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                return np.array(response.json())
+            else:
+                print(f"HF API Error: {response.text}")
+                return None
         except Exception as e:
-            print(f"Failed to load sentence-transformers model: {e}")
-            cls._model = None
-            cls._index = None
+            print(f"HF API Request failed: {e}")
+            return None
+
+    @classmethod
+    def initialize(cls):
+        if cls._category_vectors is not None:
             return
         
-        # Define semantic prototypes for categories
-        # "RAG" strategy: Retrieve the closest category concept
         prototypes = {
             "Model Inaccuracy": [
                 "wrong prediction", "incorrect outcome", "error in model", 
@@ -259,33 +273,28 @@ class TrustRAG:
         }
         
         cls._categories = []
-        vectors = []
+        phrases = []
         
-        try:
-            for category, phrases in prototypes.items():
-                for p in phrases:
-                    cls._categories.append(category)
-                    vectors.append(cls._model.encode(p))
-            
-            # Build FAISS index for fast retrieval
-            dimension = vectors[0].shape[0]
-            cls._index = faiss.IndexFlatL2(dimension)
-            cls._index.add(np.array(vectors))
-        except Exception as e:
-            print(f"Failed to initialize FAISS index: {e}")
-            cls._model = None
-            cls._index = None
+        for category, p_list in prototypes.items():
+            for p in p_list:
+                cls._categories.append(category)
+                phrases.append(p)
+                
+        vectors = cls.get_embeddings(phrases)
+        if vectors is not None:
+            cls._category_vectors = vectors
+            print("Successfully initialized TrustRAG with Hugging Face API.")
 
     def __init__(self):
-        if self._model is None:
+        if self._category_vectors is None:
             self.initialize()
 
-    def classify(self, text):
-        if not text or not isinstance(text, str):
-            return "General Skepticism"
+    def classify_batch(self, texts):
+        if not texts:
+            return []
             
-        if self._model is None or self._index is None:
-            # Robust keyword fallback
+        # Keyword fallback function
+        def keyword_fallback(text):
             text_lower = text.lower()
             if any(w in text_lower for w in ["wrong", "incorrect", "error", "false", "hallucination", "bad"]):
                 return "Model Inaccuracy"
@@ -295,28 +304,34 @@ class TrustRAG:
                 return "Human Preference"
             return "General Skepticism"
             
-        try:
-            vector = self._model.encode([text])
-            D, I = self._index.search(vector, 1)
-            closest_index = I[0][0]
-            return self._categories[closest_index]
-        except Exception as e:
-            print(f"Error during semantic classification: {e}. Using keyword fallback.")
-            text_lower = text.lower()
-            if any(w in text_lower for w in ["wrong", "incorrect", "error", "false", "hallucination", "bad"]):
-                return "Model Inaccuracy"
-            if any(w in text_lower for w in ["context", "nuance", "sarcasm", "ambiguous", "mismatch", "domain"]):
-                return "Context Failure"
-            if any(w in text_lower for w in ["override", "manual", "preference", "phrasing", "editorial", "judgment"]):
-                return "Human Preference"
-            return "General Skepticism"
+        if self._category_vectors is None:
+            return [keyword_fallback(t) for t in texts]
+            
+        # Bulk encode all texts in one API call
+        text_vectors = self.get_embeddings(texts)
+        if text_vectors is None:
+            return [keyword_fallback(t) for t in texts]
+            
+        # Calculate cosine similarity against all prototype vectors
+        similarities = cosine_similarity(text_vectors, self._category_vectors)
+        
+        # Get the closest category for each text
+        results = []
+        for i in range(len(texts)):
+            best_idx = np.argmax(similarities[i])
+            results.append(self._categories[best_idx])
+            
+        return results
 
     def build(self, notes):
         if not notes:
             return []
+            
         buckets = defaultdict(list)
-        for n in notes:
-            buckets[self.classify(n)].append(n)
+        classifications = self.classify_batch(notes)
+        
+        for note, category in zip(notes, classifications):
+            buckets[category].append(note)
 
         return [
             {"theme": k, "count": len(v), "example": v[0]}
@@ -553,8 +568,16 @@ async def analyze(file: UploadFile = File(...)):
 
 
 # -----------------------------
-# Headless API Only (Frontend is on Vercel)
+# Gradio Wrapper (For Hugging Face Free Tier)
 # -----------------------------
-@app.get("/")
-def read_root():
-    return {"status": "healthy", "message": "TrustScope ML API is running!"}
+# We wrap the FastAPI app in a dummy Gradio app so their servers host it for free.
+# Notice we mount it on path="/" so it passes Hugging Face's health check!
+CUSTOM_UI = gr.Interface(
+    fn=lambda: "TrustScope Backend is Live!",
+    inputs=None,
+    outputs="text",
+    title="TrustScope API",
+    description="This is a headless API. The frontend is served via Vercel."
+)
+
+app = gr.mount_gradio_app(app, CUSTOM_UI, path="/")
