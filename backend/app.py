@@ -134,7 +134,7 @@ def explain_model(pipeline):
 # Trust Metrics
 # -----------------------------
 def calculate_metrics(df):
-    df["date"] = pd.to_datetime(df["date"])
+    df["date"] = pd.to_datetime(df["date"], errors="coerce").fillna(pd.Timestamp("today"))
     df["week"] = df["date"].dt.to_period("W").astype(str)
 
     grouped = (
@@ -415,7 +415,16 @@ def generate_recommendations(metrics, rag, haai, complacency_risk):
 
 def detect_anomalies(df):
     if len(df) < 10:
-        return {"anomalies": [], "scatter": []}
+        # Still return scatter data so the frontend chart doesn't go blank!
+        scatter_data = []
+        for _, row in df.iterrows():
+            scatter_data.append({
+                "sentiment": float(row.get("sentiment", 0.0)),
+                "note_length": float(row.get("note_length", 0.0)),
+                "is_anomaly": False,
+                "override": bool(row.get("override", False))
+            })
+        return {"list": [], "scatter": scatter_data}
     
     features = df[["sentiment", "negativity", "skepticism_flag", "note_length"]].fillna(0)
     
