@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
-import gradio as gr
 import pandas as pd
 import numpy as np
 
@@ -568,16 +567,8 @@ async def analyze(file: UploadFile = File(...)):
 
 
 # -----------------------------
-# Gradio Wrapper (For Hugging Face Free Tier)
+# API Health Check
 # -----------------------------
-# We wrap the FastAPI app in a dummy Gradio app so their servers host it for free.
-# Notice we mount it on path="/" so it passes Hugging Face's health check!
-CUSTOM_UI = gr.Interface(
-    fn=lambda: "TrustScope Backend is Live!",
-    inputs=None,
-    outputs="text",
-    title="TrustScope API",
-    description="This is a headless API. The frontend is served via Vercel."
-)
-
-app = gr.mount_gradio_app(app, CUSTOM_UI, path="/")
+@app.get("/")
+def read_root():
+    return {"status": "healthy", "message": "TrustScope API is live on Render!"}
