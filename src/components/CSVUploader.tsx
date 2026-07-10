@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileText, CheckCircle, AlertCircle, X, Database, Shield } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle, X, Database, Shield, Info, Copy, Check, ChevronDown, FileCode } from "lucide-react";
 
 interface CSVUploaderProps {
   onDataLoaded: (data: any) => void;
@@ -22,6 +22,20 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyTemplate = () => {
+    const csvString = `date,model_decision,human_decision,confidence_note,ground_truth,department
+2024-01-01,shortlist,shortlist,Model seems accurate for this candidate,shortlist,Finance
+2024-01-02,shortlist,reject,Overriding due to lack of real-world experience,reject,Finance
+2024-01-03,reject,reject,AI correctly flagged missing qualifications,reject,HR`;
+
+    navigator.clipboard.writeText(csvString).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   // ── Upload CSV → Backend ──
   const uploadToBackend = async (file: File) => {
@@ -354,35 +368,163 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
 
           {/* Demo buttons */}
           {uploadState === "idle" && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
-              className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6"
-            >
-              <button
-                onClick={() => loadDemoData(false)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
-                style={{
-                  background: "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                }}
+            <>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+                className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6"
               >
-                <Database className="w-3.5 h-3.5" />
-                Standard Demo
-              </button>
-              <button
-                onClick={() => loadDemoData(true)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
-                style={{
-                  background: "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                }}
+                <button
+                  onClick={() => loadDemoData(false)}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
+                  style={{
+                    background: "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <Database className="w-3.5 h-3.5" />
+                  Standard Demo
+                </button>
+                <button
+                  onClick={() => loadDemoData(true)}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
+                  style={{
+                    background: "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  Ground Truth Demo
+                </button>
+              </motion.div>
+
+              {/* CSV Format Guidelines Toggle */}
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.4 }}
+                className="mt-6"
               >
-                <Shield className="w-3.5 h-3.5" />
-                Ground Truth Demo
-              </button>
-            </motion.div>
+                <button
+                  onClick={() => setIsGuideOpen(!isGuideOpen)}
+                  className="w-full py-3 px-4 rounded-xl flex items-center justify-between text-sm font-medium transition-all duration-200"
+                  style={{
+                    background: "linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                  }}
+                >
+                  <div className="flex items-center gap-2 text-white/70 hover:text-white transition-colors">
+                    <Info className="w-4 h-4 text-indigo-light" />
+                    <span>CSV Data Format Guidelines</span>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 text-white/40 transition-transform duration-200 ${
+                      isGuideOpen ? "rotate-180 text-indigo-light" : ""
+                    }`}
+                  />
+                </button>
+
+                <AnimatePresence>
+                  {isGuideOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                      animate={{ height: "auto", opacity: 1, marginTop: 12 }}
+                      exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div
+                        className="rounded-xl p-5 text-left border border-white/5 space-y-5"
+                        style={{
+                          background: "linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))",
+                          backdropFilter: "blur(10px)",
+                        }}
+                      >
+                        <div>
+                          <h4 className="text-sm font-semibold text-white/90 mb-3 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-light" />
+                            Required Columns
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2.5">
+                            {[
+                              { name: "date", desc: "Timestamp or date of human-AI decision (e.g. YYYY-MM-DD)", type: "Date" },
+                              { name: "model_decision", desc: "The recommendation/prediction generated by the AI model", type: "shortlist | reject" },
+                              { name: "human_decision", desc: "The final decision made by the human operator", type: "shortlist | reject" },
+                              { name: "confidence_note", desc: "Human feedback, comments or reasoning for the decision", type: "Text (String)" },
+                            ].map((col) => (
+                              <div key={col.name} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg border border-white/5 bg-white/[0.01] gap-2">
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs text-indigo-light font-mono font-bold bg-indigo-light/10 px-2 py-0.5 rounded">
+                                    {col.name}
+                                  </code>
+                                  <span className="text-[10px] text-white/40 font-mono">({col.type})</span>
+                                </div>
+                                <span className="text-xs text-white/50">{col.desc}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-semibold text-white/90 mb-3 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-bright" />
+                            Optional Columns (Unlocks Advanced Analytics)
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2.5">
+                            {[
+                              { name: "ground_truth", desc: "The actual correct decision. Unlocks Accuracy, Justified/Unjustified Overrides, and Missed Overrides metrics.", type: "shortlist | reject" },
+                              { name: "department", desc: "The department or team tag. Unlocks Fairness Monitor & Department-wise Trust Score analysis.", type: "Finance | HR | Engineering | ..." },
+                            ].map((col) => (
+                              <div key={col.name} className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-lg border border-white/5 bg-white/[0.01] gap-2">
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs text-emerald-bright font-mono font-bold bg-emerald-bright/10 px-2 py-0.5 rounded">
+                                    {col.name}
+                                  </code>
+                                  <span className="text-[10px] text-white/40 font-mono">({col.type})</span>
+                                </div>
+                                <span className="text-xs text-white/50">{col.desc}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-white/90 flex items-center gap-2">
+                              <FileCode className="w-4 h-4 text-indigo-light" />
+                              Sample CSV Template
+                            </h4>
+                            <button
+                              onClick={copyTemplate}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium text-white/60 hover:text-white border border-white/5 bg-white/[0.02] active:scale-95 transition-all duration-200"
+                            >
+                              {copied ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-bright" />
+                                  <span className="text-emerald-bright font-medium">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3.5 h-3.5" />
+                                  <span>Copy CSV</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <pre className="text-xs text-white/60 font-mono p-3.5 rounded-lg bg-black/40 border border-white/5 overflow-x-auto whitespace-pre leading-relaxed select-all">
+{`date,model_decision,human_decision,confidence_note,ground_truth,department
+2024-01-01,shortlist,shortlist,Model seems accurate for this candidate,shortlist,Finance
+2024-01-02,shortlist,reject,Overriding due to lack of real-world experience,reject,Finance
+2024-01-03,reject,reject,AI correctly flagged missing qualifications,reject,HR`}
+                          </pre>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            </>
           )}
         </motion.div>
       </div>
