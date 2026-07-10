@@ -66,7 +66,10 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
         body: formData,
       });
 
-      if (!res.ok) throw new Error("Backend error");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.detail || "Backend analysis failed");
+      }
 
       const data = await res.json();
 
@@ -77,9 +80,14 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
       setTimeout(() => {
         onDataLoaded(data);
       }, 600);
-    } catch (err) {
+
+      // Auto-reset state back to idle after 4 seconds
+      setTimeout(() => {
+        reset();
+      }, 4000);
+    } catch (err: any) {
       clearInterval(interval);
-      setError("Failed to connect to backend. Is the server running?");
+      setError(err.message || "Failed to connect to backend. Is the server running?");
       setUploadState("error");
     }
   };
@@ -170,6 +178,18 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
     }
 
     const filename = withGroundTruth ? "demo_ground_truth.csv" : "demo_standard.csv";
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const file = new File([blob], filename, { type: "text/csv" });
+    uploadToBackend(file);
+  };
+
+  const loadInvalidDemoData = () => {
+    // Generate a CSV that is missing the required columns (e.g. date)
+    const csvContent = `incorrect_column1,incorrect_column2
+value1,value2
+value3,value4`;
+
+    const filename = "demo_invalid_format.csv";
     const blob = new Blob([csvContent], { type: "text/csv" });
     const file = new File([blob], filename, { type: "text/csv" });
     uploadToBackend(file);
@@ -327,9 +347,19 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
                   <h3 className="text-base font-semibold mb-1 text-emerald-bright">
                     Analysis Complete
                   </h3>
-                  <p className="text-sm text-white/35">
+                  <p className="text-sm text-white/35 mb-4">
                     Scroll down for your dashboard
                   </p>
+                  <button
+                    onClick={reset}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white/60 hover:text-white transition-colors"
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    Upload Another File
+                  </button>
                 </motion.div>
               )}
 
@@ -373,7 +403,7 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.4 }}
-                className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6"
+                className="flex flex-wrap items-center justify-center gap-3 mt-6"
               >
                 <button
                   onClick={() => loadDemoData(false)}
@@ -396,6 +426,17 @@ export const CSVUploader = ({ onDataLoaded, uploadRef }: CSVUploaderProps) => {
                 >
                   <Shield className="w-3.5 h-3.5" />
                   Ground Truth Demo
+                </button>
+                <button
+                  onClick={loadInvalidDemoData}
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-lg text-[13px] font-medium text-white/60 hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
+                  style={{
+                    background: "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-red-dark" />
+                  Invalid Demo
                 </button>
               </motion.div>
 

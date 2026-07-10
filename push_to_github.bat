@@ -4,7 +4,7 @@ git init
 git add .
 git commit -m "feat: setup Render backend and Vercel frontend deployment"
 git remote remove origin 2>nul
-git remote add origin https://github.com/Mishra123456/degradix-health-hub-main.git
+git remote add origin https://github.com/Mishra123456/AI_TRUST_INSIGHTS_NEW.git
 git branch -M main
 echo Pushing to GitHub...
 git push -u origin main --force
